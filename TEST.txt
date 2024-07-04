@@ -1,0 +1,180 @@
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from tkinter import Tk, ttk, filedialog, messagebox
+
+# Global variables
+loaded_data = None
+regression_model = None
+division_categories = None
+
+# Function to load and preprocess CSV data
+def load_csv_data(file_path):
+    global loaded_data, division_categories
+    try:
+        loaded_data = pd.read_csv(file_path)
+        loaded_data['Division'] = loaded_data['Division'].astype('category')
+        division_categories = loaded_data['Division'].cat.categories
+        return True
+    except Exception as e:
+        messagebox.showerror("Error", f"Error loading CSV file: {e}")
+        return False
+
+# Function to pivot data and prepare for training
+def pivot_data_and_train():
+    global loaded_data, regression_model
+    try:
+        if loaded_data is None:
+            raise Exception("No data loaded.")
+        
+        # Pivot data to have 'Year' and 'Division' as indices
+        pivoted_data = loaded_data.pivot_table(index=['Year', 'Division'], 
+                                               values=['ForecastingAmount'], 
+                                               aggfunc='sum').reset_index()
+        
+        # Features and target
+        X = pivoted_data[['Division', 'Year']]
+        y = pivoted_data['ForecastingAmount']  # Using 'ForecastingAmount' as target for forecasting
+        
+        # Convert categorical 'Division' to dummy variables
+        X = pd.get_dummies(X, columns=['Division'])
+        
+        # Initialize and train the model
+        regression_model = LinearRegression()
+        regression_model.fit(X, y)
+        
+        messagebox.showinfo("Success", "Regression model trained successfully.")
+        return True
+    
+    except Exception as e:
+        messagebox.showerror("Error", f"Error pivoting data and training model: {e}")
+        return False
+
+# Function to predict forecasting amount
+def predict_forecasting_amount(division, year):
+    global regression_model
+    try:
+        if regression_model is None:
+            raise Exception("Model not trained.")
+        
+        # Prepare input data for prediction
+        input_data = pd.DataFrame({'Division': [division], 'Year': [year]})
+        
+        # Convert categorical 'Division' to dummy variables
+        input_data = pd.get_dummies(input_data, columns=['Division'])
+        
+        # Ensure dummy columns match those used during training
+        for cat in division_categories:
+            if f'Division_{cat}' not in input_data.columns:
+                input_data[f'Division_{cat}'] = 0
+        
+        input_data = input_data[[col for col in regression_model.feature_names_in_]]
+        
+        # Predict with the trained model
+        prediction = regression_model.predict(input_data)
+        
+        return prediction[0]
+    
+    except Exception as e:
+        messagebox.showerror("Error", f"Prediction error: {e}")
+        return None
+
+# Function to forecast forecasting amount for all divisions and all years
+def forecast_all_divisions():
+    try:
+        if regression_model is None:
+            raise Exception("Model not trained.")
+        
+        forecast_results = []
+        all_years = loaded_data['Year'].unique()
+        
+        for year in all_years:
+            for division in division_categories:
+                predicted_forecasting_amount = predict_forecasting_amount(division, year)
+                forecast_results.append((division, year, predicted_forecasting_amount))
+        
+        forecast_df = pd.DataFrame(forecast_results, columns=['Division', 'Year', 'PredictedForecastingAmount'])
+        forecast_df.to_csv('forecast_results.csv', index=False)
+        return forecast_df
+    except Exception as e:
+        messagebox.showerror("Error", f"Forecasting error: {e}")
+        return None
+
+# Function to handle file browsing and model training
+def browse_file_and_train_model():
+    global loaded_data
+    file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+    if file_path:
+        if load_csv_data(file_path):
+            if pivot_data_and_train():
+                predict_button.config(state="normal")
+                forecast_button.config(state="normal")
+                result_label.config(text="CSV file loaded, data pivoted, and model trained successfully.")
+            else:
+                result_label.config(text="Error pivoting data and training model.")
+        else:
+            result_label.config(text="Error loading CSV file.")
+
+# Function to predict based on user input
+def predict():
+    try:
+        division = division_entry.get().strip()
+        year = int(year_entry.get().strip())
+        
+        if division == '' or year == '':
+            result_label.config(text="Error: Division and Year fields cannot be empty.")
+            return
+        
+        predicted_forecasting_amount = predict_forecasting_amount(division, year)
+        if predicted_forecasting_amount is not None:
+            result_label.config(text=f"Predicted Forecasting Amount for {division} in {year}: {predicted_forecasting_amount:.2f}")
+        else:
+            result_label.config(text=f"Error: Prediction failed for Division '{division}' and Year {year}.")
+    
+    except ValueError:
+        result_label.config(text="Error: Year must be numeric.")
+
+# Function to forecast for all divisions and display results
+def forecast():
+    try:
+        forecast_df = forecast_all_divisions()
+        if forecast_df is not None:
+            forecast_text = forecast_df.to_string(index=False)
+            result_label.config(text=f"Forecast results:\n{forecast_text}")
+        else:
+            result_label.config(text="Error: Forecasting failed.")
+    
+    except ValueError:
+        result_label.config(text="Error: Year fields must be numeric.")
+
+# GUI setup
+app = Tk()
+app.title("Forecasting Amount Prediction")
+
+# Browse button to select CSV file
+browse_button = ttk.Button(app, text="Browse CSV File", command=browse_file_and_train_model)
+browse_button.grid(row=0, column=0, columnspan=2, pady=10)
+
+# Division and Year input fields
+division_label = ttk.Label(app, text="Division:")
+division_label.grid(row=1, column=0, padx=10, pady=5, sticky="e")
+division_entry = ttk.Entry(app)
+division_entry.grid(row=1, column=1, padx=10, pady=5)
+
+year_label = ttk.Label(app, text="Year:")
+year_label.grid(row=2, column=0, padx=10, pady=5, sticky="e")
+year_entry = ttk.Entry(app)
+year_entry.grid(row=2, column=1, padx=10, pady=5)
+
+# Predict button
+predict_button = ttk.Button(app, text="Predict", command=predict, state="disabled")
+predict_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+# Forecast button
+forecast_button = ttk.Button(app, text="Forecast All Divisions", command=forecast, state="disabled")
+forecast_button.grid(row=4, column=0, columnspan=2, pady=10)
+
+# Result label
+result_label = ttk.Label(app, text="Status: Waiting for CSV file.")
+result_label.grid(row=5, column=0, columnspan=2, pady=10)
+
+app.mainloop()
