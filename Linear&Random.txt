@@ -1,0 +1,149 @@
+from tkinter import *
+from tkinter import filedialog, ttk, messagebox
+from PIL import Image, ImageTk
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+
+root = Tk()
+root.geometry('1370x700+0+0')
+root.title('NMRL FBE')
+
+def load_image(image_path):
+    try:
+        image = Image.open(image_path)
+        return image
+    except Exception as e:
+        messagebox.showerror("Error", f"Unable to load image. Error: {e}")
+        return None
+
+image_path = 'C:/Users/gaura/Desktop/NMRL/nmrl_logo.jpg'
+image = load_image(image_path)
+if image:
+    image = image.resize((300, 300), Image.LANCZOS)
+    bg_image = ImageTk.PhotoImage(image)
+
+    # Create a canvas to place the image
+    canvas = Canvas(root, width=1370, height=700)
+    canvas.place(x=0, y=0, relwidth=1, relheight=1)
+    canvas.create_image(685, 350, image=bg_image, anchor="center")
+
+header = Frame(root, width=1370, bd=4)
+header.pack(side=TOP, fill=X)
+
+def back_btn():
+    root.destroy()
+    import main_window
+
+def submit_path():
+    global df, departments, X_train, X_test, y_train, y_test, dept_models, dept_rf_models
+    
+    # Load data from CSV
+    df = pd.read_csv(file_path)
+    
+    # Extract years and department names
+    years = df['FINANCIAL_YR']
+    departments = df.columns[1:]  # Exclude the 'Year' column
+    
+    # Convert to numpy array for modeling
+    X = np.array(years).reshape(-1, 1)  # Years as input feature
+    
+    # Split data into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, df.iloc[:, 1:], test_size=0.2, random_state=42)
+    
+    # Train both linear regression and random forest models for each department
+    dept_models = {}
+    dept_rf_models = {}
+    for dept in departments:
+        y = df[dept]
+        lin_model = LinearRegression()
+        rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
+        lin_model.fit(X_train, y_train[dept])
+        rf_model.fit(X_train, y_train[dept])
+        dept_models[dept] = lin_model
+        dept_rf_models[dept] = rf_model
+    
+    # Display a message or update UI after model training (optional)
+    print("Models trained successfully.")
+
+def predict_total_forecast(year):
+    total_forecast = 0
+    for dept, model in dept_models.items():
+        rf_model = dept_rf_models[dept]
+        # Average predictions from both models
+        lin_pred = model.predict(np.array(year).reshape(-1, 1))[0]
+        rf_pred = rf_model.predict(np.array(year).reshape(-1, 1))[0]
+        forecast_amount = (lin_pred + rf_pred) / 2
+        total_forecast += forecast_amount
+    return round(total_forecast, 2)
+
+def predict_dept_forecast(year):
+    dept_forecasts = {}
+    for dept, model in dept_models.items():
+        rf_model = dept_rf_models[dept]
+        lin_pred = model.predict(np.array(year).reshape(-1, 1))[0]
+        rf_pred = rf_model.predict(np.array(year).reshape(-1, 1))[0]
+        forecast_amount = (lin_pred + rf_pred) / 2
+        dept_forecasts[dept] = round(forecast_amount, 2)
+    return dept_forecasts
+
+def read_csv_file(file_path):
+    with open(file_path, 'r') as file:
+        reader = csv.reader(file)
+        content = [row for row in reader]
+    return content
+
+def browse_files():
+    global file_path
+    file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
+    if file_path:
+        print(file_path)
+
+Label(header, text='NMRL FBE', font=('Times New Roman', 36, 'bold'), fg='black', bg='orange', bd=6, relief='ridge').pack(side=TOP, fill=X)
+body = Frame(root, width=1370, bd=6, bg='green', relief='ridge')
+body.pack(side=TOP, fill=X)
+
+Label(body, text='Select dataset to predict:', font=('Times New Roman', 14, 'bold'), bg='green', fg='black').pack(side=LEFT)
+browse_button = Button(body, text="Browse Documents", command=browse_files)
+browse_button.pack(side=LEFT)
+
+Label(body, text='Enter required year:', font=('Times New Roman', 14, 'bold'), bg='green', fg='black').pack(side=LEFT)
+e2 = Entry(body, font=('Times New Roman', 14, 'normal'), bd=4)
+e2.pack(side=LEFT, padx=20)
+
+btn_frame = Frame(root, width=1370, bd=4)
+btn_frame.pack(side=TOP)
+
+sbt_btn = Button(btn_frame, text='Submit', width=15, bd=3, command=submit_path)
+sbt_btn.pack(side=LEFT)
+
+def display_forecasts():
+    year_to_predict = int(e2.get())
+    
+    # Total forecast for the organization
+    total_forecast = predict_total_forecast(year_to_predict)
+    total_text = f'Total forecasted amount for the organization in {year_to_predict}: {total_forecast}'
+    
+    # Department-wise forecasts
+    dept_forecasts = predict_dept_forecast(year_to_predict)
+    dept_text = "\nDepartment-wise forecasts:\n"
+    for dept, forecast in dept_forecasts.items():
+        dept_text += f"{dept}: {forecast}\n"
+    
+    # Display results
+    result_text = total_text + "\n" + dept_text
+    output = Frame(root, width=1370, bd=6, bg='black')
+    output.pack(side=TOP)
+    Label(output, text=result_text, font=('Times New Roman', 14, 'bold'), fg='aqua', bg='black', bd=6, pady=10).pack(side=TOP)
+    Button(output, text='Clear Result', width=15, bd=3, command=output.destroy).pack(side=TOP)
+
+back=Button(header,text='Go Back',width=15,bd=3,bg='blue',fg='white',command=back_btn)
+back.pack(side=BOTTOM,padx=0)
+
+sbt_btn_display = Button(btn_frame, text='Display Forecasts', width=15, bd=3, command=display_forecasts)
+sbt_btn_display.pack(side=LEFT)
+
+mainloop()
