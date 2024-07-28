@@ -1,0 +1,44 @@
+To install mysql-connector-python on a PC without internet access, you can download the necessary package files on a machine with internet access and then transfer the files to the offline PC. Here are the steps to do this:
+
+Download the package files on a machine with internet access:
+
+Go to the PyPI page for mysql-connector-python.
+Download the .whl (wheel) file that matches your Python version and system architecture.
+Transfer the package files to the offline PC:
+
+Use a USB drive or any other method to transfer the downloaded .whl file to the offline PC.
+Install the package on the offline PC:
+
+Copy the .whl file to a directory on the offline PC.
+
+Open a command prompt (or terminal) on the offline PC and navigate to the directory where you copied the .whl file.
+
+Use the following command to install the package:
+pip install mysql_connector_python-<version>-py<python_version>-none-any.whl
+
+Replace <version> and <python_version> with the actual version numbers from the .whl file name.
+
+For example, if you downloaded mysql_connector_python-8.0.26-py3-none-any.whl, you would use:
+pip install mysql_connector_python-8.0.26-py3-none-any.whl
+
+Example Step-by-Step Instructions
+Download the package:
+
+From a machine with internet access, visit PyPI mysql-connector-python and download mysql_connector_python-8.0.26-py3-none-any.whl.
+Transfer the file:
+
+Copy the downloaded .whl file to a USB drive.
+Install the package on the offline PC:
+
+Connect the USB drive to the offline PC.
+
+Copy the .whl file from the USB drive to a directory on the offline PC, e.g., C:\packages.
+
+Open Command Prompt and navigate to the directory:
+
+cd C:\packages
+
+Install the package using pip:(Eg)
+pip install mysql_connector_python-8.0.26-py3-none-any.whl
+
+This process will install mysql-connector-python on the offline PC. If there are dependencies, you'll need to download and transfer those as well, following the same process.
